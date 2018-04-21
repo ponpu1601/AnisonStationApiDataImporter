@@ -102,31 +102,30 @@ def parse_program(field,pro_type_id,game_genre_id):
         'broadcast_start_on':ensure_date(field[Fields_Index.BROADCAST_START_ON])
     }
 
+def load_csv(reader):
+    # ヘッダーを飛ばす
+    header = next(reader)
+    print(header)
+    # 一気に読み込む
+    fields = []
+    for row in reader:
+        fields.append(row)
+    return fields
+
+
 print ('starting program at',datetime.now())
 
-
 conf = load_config()
-print(conf.get('database','user'))
-print(conf.get('database','passwd'))
-print(conf.get('database','db'))
-print(conf.get('database','host'))
-print(conf.get('database','port'))
-print(conf.get('database','charaset'))
-#args = sys.argv
-#file_path = args[1]
 
-#csv読み込み
-# csv_file = open(file_path,'r',encoding='utf8')
-# reader = csv.reader(csv_file , delimiter=',',doublequote=True,lineterminator="\r\n",quotechar='"',skipinitialspace=True)
+args = sys.argv
+file_path = args[1]
 
-# #ヘッダーを飛ばす
-# header = next(reader)
-# print(header)
+# csv読み込み
+csv_file = open(file_path,'r',encoding='utf8')
+reader = csv.reader(csv_file , delimiter=',',doublequote=True,lineterminator="\r\n",quotechar='"',skipinitialspace=True)
 
-# #一気に読み込む
-# fields = []
-# for row in reader:
-#     fields.append(row)
+#一気に読み込む
+fields = load_csv(reader)
 
 # データベースに接続
 try:
@@ -136,17 +135,26 @@ try:
         )
     cursor = connect.cursor(buffered=True,dictionary=True)
 
+    # コードのマスターを取得
     program_types = get_program_types(cursor)
     game_genres = get_game_genres(cursor)
-    programs = []
+
+    # 一括upsert用のdictionaryリストを作成
+    programs = []    
     for field in fields:
+
+        # 番組種別をマスターから取得　なかったら作る
         tmp_program_type = {'name':field[Fields_Index.PROGRAM_TYPE]}
         pro_type = ensure_object(program_types,tmp_program_type,'name')
+        
+        # ゲームジャンルをマスターから取得　無かったら作る
         tmp_game_genre = {'name':field[Fields_Index.GAME_GENRE]}
         g_genre = ensure_object(game_genres,tmp_game_genre,'name')
+        
+        # csvのフィールドをprogramにパース
         programs.append(parse_program(field,pro_type['id'],g_genre['id']))
 
-# それぞれのマスターを更新
+    # それぞれのマスターを更新
     for program_type in program_types:
         program_type['table'] = 'program_types'
         upsert_program_types(cursor,program_type)
@@ -154,11 +162,15 @@ try:
     for game_genre in game_genres:
         game_genre['table'] = 'game_genres'
         upsert_game_genres(cursor,game_genre)
+    
+    # program.csv内にマスター新規追加分があった場合にデータベース上に
+    # それぞれのエンティティが必要なためコミット
     connect.commit()
 
-#programを挿入
+    # programを挿入
     for program in programs:
         upsert_program(cursor,program)
+
 
     connect.commit()
 finally:
