@@ -117,6 +117,7 @@ print ('starting program at',datetime.now())
 
 conf = load_config()
 
+# コマンドラインからのファイルパスを取得
 args = sys.argv
 file_path = args[1]
 
@@ -126,6 +127,7 @@ reader = csv.reader(csv_file , delimiter=',',doublequote=True,lineterminator="\r
 
 #一気に読み込む
 fields = load_csv(reader)
+print('csv_file was loaded at',datetime.now())
 
 # データベースに接続
 try:
@@ -135,7 +137,7 @@ try:
         )
     cursor = connect.cursor(buffered=True,dictionary=True)
 
-    # コードのマスターを取得
+    # マスターを取得
     program_types = get_program_types(cursor)
     game_genres = get_game_genres(cursor)
 
@@ -153,6 +155,8 @@ try:
         
         # csvのフィールドをprogramにパース
         programs.append(parse_program(field,pro_type['id'],g_genre['id']))
+    
+    print('csv_file was parsed at',datetime.now())
 
     # それぞれのマスターを更新
     for program_type in program_types:
@@ -166,13 +170,15 @@ try:
     # program.csv内にマスター新規追加分があった場合にデータベース上に
     # それぞれのエンティティが必要なためコミット
     connect.commit()
+    print('masters were committed at',datetime.now())
 
     # programを挿入
     for program in programs:
         upsert_program(cursor,program)
 
-
     connect.commit()
+    print('programs(count:%s) were committed at' % len(programs),datetime.now())
+
 finally:
     cursor.close
     connect.close
