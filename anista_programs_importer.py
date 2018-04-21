@@ -24,10 +24,18 @@ class Fields_Index(IntEnum):
     OTHER_TITLE_02 = 6
     BROADCAST_START_ON = 9
 
+def dump_config(conf):
+    print(conf.get('database','user'))
+    print(conf.get('database','passwd'))
+    print(conf.get('database','db'))
+    print(conf.get('database','host'))
+    print(conf.get('database','port'))
+    print(conf.get('database','charaset'))
+
 def load_config():
     inifile = configparser.ConfigParser()
     inifile.read('config.ini','UTF-8')
-    print(inifile.get('database','user'))
+    dump_config(inifile)
     return inifile
 
 def get_program_types(cursor):
@@ -94,7 +102,7 @@ def parse_program(field,pro_type_id,game_genre_id):
         'broadcast_start_on':ensure_date(field[Fields_Index.BROADCAST_START_ON])
     }
 
-print ('starting program at ',datetime.now())
+print ('starting program at',datetime.now())
 
 
 conf = load_config()
@@ -157,4 +165,4 @@ finally:
     cursor.close
     connect.close
 
-print ('terminating program at ',datetime.now())
+print ('terminating program at',datetime.now())
