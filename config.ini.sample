@@ -1,0 +1,9 @@
+# コメントアウトも出来ます
+[database]
+host = localhost
+port = yourport
+passwd = yourpassword
+user = youruser
+db = anisonstationdataservice
+charaset = utf8
+
