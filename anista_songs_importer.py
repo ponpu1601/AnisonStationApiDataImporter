@@ -183,7 +183,7 @@ try:
     # 一括upsert用のdictionaryリストを作成
     sorted_fields=sorted(fields,key=lambda field:(int(field[Fields_Index.PROGRAM_ID])))
 
-    songs = []    
+    songs = []
     for field in sorted_fields:
         # 摘要をマスターから取得　なかったら作る
         tmp_song_role = {'code':field[Fields_Index.SONG_ROLE]}
@@ -197,14 +197,13 @@ try:
         # Programsのanisoninfo_idの最大値までParseしたらProgramsを再取得
         if int(field[Fields_Index.PROGRAM_ID]) >= max_aniin_program['anisoninfo_program_id']:
             programs_range =int(field[Fields_Index.PROGRAM_ID])
-            programs = get_programs_limit(cursor,programs_range)
-            if len(programs) != 0:
+            tmp_programs = get_programs_limit(cursor,programs_range)
+            if len(tmp_programs) != 0:
+                programs=tmp_programs
                 max_aniin_program = max(programs,key=lambda program: int(program['anisoninfo_program_id']))
-                print('fetch 200 programs from %s at'%programs_range,datetime.now())
+                print('fetch 200 programs from %s max %s at'%(programs_range,max_aniin_program['anisoninfo_program_id']),datetime.now())
             else:
                 print('current row',field)
-                break
-
         
         # anisoninfo_program_idをマスターから取得　無かったら作る
         tmp_anisoninfo_program = {'anisoninfo_program_id':field[Fields_Index.PROGRAM_ID]}
