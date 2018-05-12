@@ -4,6 +4,7 @@ import configparser
 import csv
 import re
 import sys
+import traceback
 from datetime import datetime
 from enum import IntEnum
 from operator import itemgetter
@@ -232,7 +233,11 @@ try:
 
     # songsを挿入
     for song in songs:
-        upsert_song(cursor,song)
+        try:
+            upsert_song(cursor,song)
+        except:
+            traceback.print_exc()
+            print('register failed ',song,datetime.now())
 
     connect.commit()
     print('songs(count:%s) were committed at' % len(songs),datetime.now())
