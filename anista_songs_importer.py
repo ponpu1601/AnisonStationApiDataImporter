@@ -47,12 +47,16 @@ def get_song_roles(cursor):
 def get_singers(cursor):
     sql='select id , name from singers;'
     cursor.execute(sql)
-    return cursor.fetchall()
+    singers=cursor.fetchall()
+    singer_dict = dict(map(lambda singer:(singer['name'],singer),singers))
+    return singer_dict
 
 def get_programs_limit(cursor,start_id):
-    sql='select * from programs where anisoninfo_program_id >= %s order by anisoninfo_program_id limit 200;'
+    sql='select * from programs where anisoninfo_program_id >= %s order by anisoninfo_program_id limit 5000;'
     cursor.execute(sql,(start_id,))
-    return cursor.fetchall()
+    programs = cursor.fetchall() 
+    program_dict = dict(map(lambda program:(str(program['anisoninfo_program_id']),program),programs))
+    return program_dict
 
 def ensure_program_id(cursor,anisoninfo_program_id):
     sql='select * from programs where anisoninfo_program_id = %s;'
@@ -71,15 +75,21 @@ def store_program(cursor,program_id):
     pass
 
 def ensure_object_key_integer(obj_dictionary_list,target_obj,compared_key):
-    matched_obj = [obj for obj in obj_dictionary_list if re.fullmatch(re.escape(str(target_obj[compared_key])),re.escape(str(obj[compared_key])))]
-    if len(matched_obj)!=0:
-        return matched_obj[0]
-    else:
-        target_obj['id'] = get_last_item_id(obj_dictionary_list) + 1
+    try:
+        return obj_dictionary_list[target_obj[compared_key]]
+    except KeyError:
+        target_obj['id'] = get_last_item_id_in_dict(obj_dictionary_list) + 1
         target_obj['title'] = ''
-        obj_dictionary_list.append(target_obj)
+        obj_dictionary_list[target_obj[compared_key]] = target_obj
         return target_obj
-        
+
+def ensure_singer(obj_dictionary_list,target_obj,compared_key):
+    try:
+        return obj_dictionary_list[target_obj[compared_key]]
+    except KeyError:
+        target_obj['id'] = get_last_item_id_in_dict(obj_dictionary_list) + 1
+        obj_dictionary_list[target_obj[compared_key]] = target_obj
+        return target_obj
 
 def ensure_object(obj_dictionary_list,target_obj,compared_key):
     # MySQLは大文字小文字を区別しないため、ここで判定しないとDB登録時に重複している判断される
@@ -95,6 +105,11 @@ def ensure_object(obj_dictionary_list,target_obj,compared_key):
 def get_last_item_id(obj_dictionary_list):
     last_item = sorted(obj_dictionary_list,key=itemgetter('id'),reverse=True)[0]
     return last_item['id']
+
+def get_last_item_id_in_dict(obj_dictionary_dict):
+    last_item = sorted(obj_dictionary_dict.values(),key=itemgetter('id'),reverse=True)[0]
+    return last_item['id']
+
 
 def upsert_song_role(cursor,dictionary):
     insert_dup = 'insert into song_roles (id , code) values ( %(id)s , %(code)s ) on duplicate key update name = %(name)s'
@@ -177,23 +192,26 @@ try:
     # マスターを取得
     song_roles = get_song_roles(cursor)
     singers = get_singers(cursor)
-    programs = get_programs_limit(cursor,0)
-    max_aniin_program = max(programs,key=lambda program: int(program['anisoninfo_program_id']))
-    programs_range = 0
+    programs = get_programs_limit(cursor,0)    
 
+    max_aniin_program = max(programs.values(),key=lambda program: int(program['anisoninfo_program_id']))
+    programs_range = 0
     # 一括upsert用のdictionaryリストを作成
     sorted_fields=sorted(fields,key=lambda field:(int(field[Fields_Index.PROGRAM_ID])))
-
+    
     songs = []
     for field in sorted_fields:
         # 摘要をマスターから取得　なかったら作る
+        print('start ensure song_role',datetime.now())
         tmp_song_role = {'code':field[Fields_Index.SONG_ROLE]}
         song_role = ensure_object(song_roles,tmp_song_role,'code')
+        print('end ensure song_role',datetime.now())
         #print('fetched song_role at',datetime.now())
         # 歌手をマスターから取得　無かったら作る
+        print('start ensure singer',datetime.now())
         tmp_singer = {'name':field[Fields_Index.SINGER]}
-        singer = ensure_object(singers,tmp_singer,'name')
-        #print('fetched singer at',datetime.now())
+        singer = ensure_singer(singers,tmp_singer,'name')
+        print('end ensure singer',datetime.now())
 
         # Programsのanisoninfo_idの最大値までParseしたらProgramsを再取得
         if int(field[Fields_Index.PROGRAM_ID]) >= max_aniin_program['anisoninfo_program_id']:
@@ -201,14 +219,16 @@ try:
             tmp_programs = get_programs_limit(cursor,programs_range)
             if len(tmp_programs) != 0:
                 programs=tmp_programs
-                max_aniin_program = max(programs,key=lambda program: int(program['anisoninfo_program_id']))
+                max_aniin_program = max(programs.values(),key=lambda program: int(program['anisoninfo_program_id']))
                 print('fetch 200 programs from %s max %s at'%(programs_range,max_aniin_program['anisoninfo_program_id']),datetime.now())
             else:
                 print('current row',field)
         
+        print('start ensure program',datetime.now())
         # anisoninfo_program_idをマスターから取得　無かったら作る
         tmp_anisoninfo_program = {'anisoninfo_program_id':field[Fields_Index.PROGRAM_ID]}
         program = ensure_object_key_integer(programs,tmp_anisoninfo_program,'anisoninfo_program_id')
+        print('end ensure program',datetime.now())
         #print('fetched program at',datetime.now())
         # csvのフィールドをsongにパースして追加
         song = parse_song(field,song_role['id'],singer['id'],program['id'])
@@ -220,10 +240,10 @@ try:
     for song_role in song_roles:
         upsert_song_role(cursor,song_role)
 
-    for singer in singers:
+    for singer in singers.values():
         upsert_singer(cursor,singer)
     
-    for program in programs:
+    for program in programs.values():
         upsert_program(cursor,program)
 
     # song.csv内にマスター新規追加分があった場合にデータベース上に
@@ -236,7 +256,7 @@ try:
         try:
             upsert_song(cursor,song)
         except:
-            traceback.print_exc()
+            print(sys.exc_info()[0])
             print('register failed ',song,datetime.now())
 
     connect.commit()
