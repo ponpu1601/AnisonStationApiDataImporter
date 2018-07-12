@@ -24,12 +24,9 @@ class Fields_Index(IntEnum):
     SINGER = 7
 
 def dump_config(conf):
-    print(conf.get('database','user'))
-    print(conf.get('database','passwd'))
-    print(conf.get('database','db'))
-    print(conf.get('database','host'))
-    print(conf.get('database','port'))
-    print(conf.get('database','charaset'))
+    for section in conf.sections():
+        for option in conf.options(section):
+            print('section:%s option:%s value:%s' % (section,option,conf.get(section,option)))
 
 def load_config():
     inifile = configparser.ConfigParser()
