@@ -12,6 +12,7 @@ import dateutil.parser
 # ドライバをimport
 import mysql.connector
 
+from product_config import ProductConfig
 
 class Fields_Index(IntEnum):
     PROGRAM_ID = 0
@@ -22,17 +23,6 @@ class Fields_Index(IntEnum):
     SONG_ID = 5
     TITLE = 6
     SINGER = 7
-
-def dump_config(conf):
-    for section in conf.sections():
-        for option in conf.options(section):
-            print('section:%s option:%s value:%s' % (section,option,conf.get(section,option)))
-
-def load_config():
-    inifile = configparser.ConfigParser()
-    inifile.read('config.ini','UTF-8')
-    dump_config(inifile)
-    return inifile
 
 def get_song_roles(cursor):
     sql='select id , code , name from song_roles;'
@@ -162,7 +152,8 @@ def load_csv(reader):
 
 print ('starting program at',datetime.now())
 
-conf = load_config()
+conf = ProductConfig()
+conf.load_inifile('config.ini')
 
 # コマンドラインからのファイルパスを取得
 args = sys.argv
@@ -179,8 +170,8 @@ print('csv_file was loaded at',datetime.now())
 # データベースに接続
 try:
     connect = mysql.connector.connect( \
-        user=conf.get('database','user'), passwd=conf.get('database','passwd'), host=conf.get('database','host'), \
-        port=conf.getint('database','port'), db=conf.get('database','db'),charset=conf.get('database','charaset') \
+        user=conf.user, passwd=conf.password, host=conf.host, \
+        port=conf.port, db=conf.database_name,charset=conf.charaset \
         )
     cursor = connect.cursor(buffered=True,dictionary=True)
 
