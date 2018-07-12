@@ -11,7 +11,7 @@ class ProductConfig:
     
     _port = ''
     @property
-    def port(self) -> str:
+    def port(self) -> int:
         return self._port
 
     _password= ''
@@ -50,7 +50,7 @@ class ProductConfig:
     def parse(self,config:configparser.ConfigParser):
         options = config[self._config_section_name]
         self._host = options['host']
-        self._port = options['port']
+        self._port = int(options['port'])
         self._user = options['user']
         self._password = options['passwd']
         self._database_name = options['db']
