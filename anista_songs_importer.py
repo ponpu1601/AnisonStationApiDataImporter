@@ -8,8 +8,6 @@ import traceback
 from datetime import datetime
 from enum import IntEnum
 from operator import itemgetter
-
-import dataset
 import dateutil.parser
 # ドライバをimport
 import mysql.connector
