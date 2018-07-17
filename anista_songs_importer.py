@@ -220,8 +220,14 @@ try:
 
     for singer in singers.values():
         upsert_singer(cursor,singer)
-    
-    for program in programs.values():
+
+    new_programs=[]
+    for k in programs.keys():
+        if int(k) > max_aniin_program['anisoninfo_program_id']:
+            new_programs.append(programs[k])
+
+    for program in new_programs:
+        print(program)
         upsert_program(cursor,program)
 
     # song.csv内にマスター新規追加分があった場合にデータベース上に
