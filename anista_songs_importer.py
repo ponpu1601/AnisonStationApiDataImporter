@@ -34,15 +34,13 @@ def get_singers(cursor):
     sql='select id , name from singers;'
     cursor.execute(sql)
     singers=cursor.fetchall()
-    singer_dict = dict(map(lambda singer:(singer['name'],singer),singers))
-    return singer_dict
+    return singers
 
-def get_programs_limit(cursor,start_id):
+def get_programs(cursor,start_id):
     sql='select * from programs where anisoninfo_program_id >= %s order by anisoninfo_program_id;'
     cursor.execute(sql,(start_id,))
     programs = cursor.fetchall() 
-    program_dict = dict(map(lambda program:(str(program['anisoninfo_program_id']),program),programs))
-    return program_dict
+    return programs
 
 def ensure_program_id(cursor,anisoninfo_program_id):
     sql='select * from programs where anisoninfo_program_id = %s;'
@@ -54,6 +52,8 @@ def ensure_program_id(cursor,anisoninfo_program_id):
     else:
         return program['id']
 
+def index_lists(target_lists,key):
+    return dict(map(lambda item:(item[key],item),target_lists))
 
 def store_program(cursor,program_id):
     sql='insert into programs (anisoninfo_program_id) values (%s);'
@@ -180,8 +180,11 @@ try:
 
     # マスターを取得
     song_roles = get_song_roles(cursor)
-    singers = get_singers(cursor)
-    programs = get_programs_limit(cursor,0)    
+    singer_list = get_singers(cursor)
+    program_list = get_programs(cursor,0)    
+
+    singers = index_lists(singer_list,'name')
+    programs= index_lists(program_list,'anisoninfo_program_id')
 
     program_id_max = get_last_item_id_in_dict(programs)
     programs_range = 0
@@ -205,9 +208,9 @@ try:
         
         print('start ensure program',datetime.now())
         # anisoninfo_program_idをマスターから取得　無かったら作る
-        tmp_anisoninfo_program = {'anisoninfo_program_id':field[Fields_Index.PROGRAM_ID]}
+        tmp_anisoninfo_program = {'anisoninfo_program_id':int(field[Fields_Index.PROGRAM_ID])}
         program = ensure_object_key_integer(programs,tmp_anisoninfo_program,'anisoninfo_program_id')
-        print('end ensure program',programs[field[Fields_Index.PROGRAM_ID]]['id'],programs[field[Fields_Index.PROGRAM_ID]]['anisoninfo_program_id'],datetime.now())
+        print('end ensure program',programs[int(field[Fields_Index.PROGRAM_ID])]['id'],programs[int(field[Fields_Index.PROGRAM_ID])]['anisoninfo_program_id'],datetime.now())
         #print('fetched program at',datetime.now())
         # csvのフィールドをsongにパースして追加
         song = parse_song(field,song_role['id'],singer['id'],program['id'])
