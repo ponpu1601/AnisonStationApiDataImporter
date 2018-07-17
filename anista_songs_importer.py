@@ -14,6 +14,7 @@ import mysql.connector
 
 from product_config import ProductConfig
 
+
 class Fields_Index(IntEnum):
     PROGRAM_ID = 0
     PROGRAM_TYPE = 1
@@ -37,7 +38,7 @@ def get_singers(cursor):
     return singer_dict
 
 def get_programs_limit(cursor,start_id):
-    sql='select * from programs where anisoninfo_program_id >= %s order by anisoninfo_program_id limit 5000;'
+    sql='select * from programs where anisoninfo_program_id >= %s order by anisoninfo_program_id;'
     cursor.execute(sql,(start_id,))
     programs = cursor.fetchall() 
     program_dict = dict(map(lambda program:(str(program['anisoninfo_program_id']),program),programs))
@@ -59,22 +60,24 @@ def store_program(cursor,program_id):
     cursor.execute(sql,(program_id,))
     pass
 
-def ensure_object_key_integer(obj_dictionary_list,target_obj,compared_key):
+def ensure_object_key_integer(obj_dictionary_list,target_obj,compared_key):    
     try:
         return obj_dictionary_list[target_obj[compared_key]]
     except KeyError:
-        target_obj['id'] = get_last_item_id_in_dict(obj_dictionary_list) + 1
+        target_obj['id'] = get_last_item_id_in_dict(obj_dictionary_list)+1
         target_obj['title'] = ''
         obj_dictionary_list[target_obj[compared_key]] = target_obj
+        print(obj_dictionary_list[target_obj[compared_key]])
         return target_obj
 
-def ensure_singer(obj_dictionary_list,target_obj,compared_key):
+def ensure_singer(singer_dictionary,target_obj,compared_key):
     try:
-        return obj_dictionary_list[target_obj[compared_key]]
+        return singer_dictionary[target_obj[compared_key]]
     except KeyError:
-        target_obj['id'] = get_last_item_id_in_dict(obj_dictionary_list) + 1
-        obj_dictionary_list[target_obj[compared_key]] = target_obj
+        target_obj['id'] = get_last_item_id_in_dict(singer_dictionary) + 1
+        singer_dictionary[target_obj[compared_key]] = target_obj
         return target_obj
+
 
 def ensure_object(obj_dictionary_list,target_obj,compared_key):
     # MySQLは大文字小文字を区別しないため、ここで判定しないとDB登録時に重複している判断される
@@ -199,29 +202,18 @@ try:
         singer = ensure_singer(singers,tmp_singer,'name')
         print('end ensure singer',datetime.now())
 
-        # Programsのanisoninfo_idの最大値までParseしたらProgramsを再取得
-        if int(field[Fields_Index.PROGRAM_ID]) >= max_aniin_program['anisoninfo_program_id']:
-            programs_range =int(field[Fields_Index.PROGRAM_ID])
-            tmp_programs = get_programs_limit(cursor,programs_range)
-            if len(tmp_programs) != 0:
-                programs=tmp_programs
-                max_aniin_program = max(programs.values(),key=lambda program: int(program['anisoninfo_program_id']))
-                print('fetch 200 programs from %s max %s at'%(programs_range,max_aniin_program['anisoninfo_program_id']),datetime.now())
-            else:
-                print('current row',field)
         
         print('start ensure program',datetime.now())
         # anisoninfo_program_idをマスターから取得　無かったら作る
         tmp_anisoninfo_program = {'anisoninfo_program_id':field[Fields_Index.PROGRAM_ID]}
         program = ensure_object_key_integer(programs,tmp_anisoninfo_program,'anisoninfo_program_id')
-        print('end ensure program',datetime.now())
+        print('end ensure program',programs[field[Fields_Index.PROGRAM_ID]]['id'],programs[field[Fields_Index.PROGRAM_ID]]['anisoninfo_program_id'],datetime.now())
         #print('fetched program at',datetime.now())
         # csvのフィールドをsongにパースして追加
         song = parse_song(field,song_role['id'],singer['id'],program['id'])
         songs.append(song)
     
     print('csv_file was parsed at',datetime.now())
-    
     # それぞれのマスターを更新
     for song_role in song_roles:
         upsert_song_role(cursor,song_role)
@@ -235,20 +227,22 @@ try:
     # song.csv内にマスター新規追加分があった場合にデータベース上に
     # それぞれのエンティティが必要なためコミット
     connect.commit()
+    cursor.close()
     print('masters were committed at',datetime.now())
-
+    cursor=connect.cursor(buffered=True,dictionary=True)
     # songsを挿入
     for song in songs:
         try:
             upsert_song(cursor,song)
         except:
-            print(sys.exc_info()[0])
-            print('register failed ',song,datetime.now())
+            ex = sys.exc_info()
+            print(ex[0],ex[1],ex[2])
+            print('register failed',song,datetime.now(),)
 
     connect.commit()
     print('songs(count:%s) were committed at' % len(songs),datetime.now())
 finally:
-    cursor.close
-    connect.close
+    cursor.close()
+    connect.close()
 
 print ('terminating program at',datetime.now())
