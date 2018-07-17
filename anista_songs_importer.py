@@ -183,7 +183,7 @@ try:
     singers = get_singers(cursor)
     programs = get_programs_limit(cursor,0)    
 
-    max_aniin_program = max(programs.values(),key=lambda program: int(program['anisoninfo_program_id']))
+    program_id_max = get_last_item_id_in_dict(programs)
     programs_range = 0
     # 一括upsert用のdictionaryリストを作成
     sorted_fields=sorted(fields,key=lambda field:(int(field[Fields_Index.PROGRAM_ID])))
@@ -221,13 +221,13 @@ try:
     for singer in singers.values():
         upsert_singer(cursor,singer)
 
+    # 新規分を追加
     new_programs=[]
-    for k in programs.keys():
-        if int(k) > max_aniin_program['anisoninfo_program_id']:
-            new_programs.append(programs[k])
+    for program in programs.values():
+        if int(program['id']) > program_id_max:
+            new_programs.append(program)
 
     for program in new_programs:
-        print(program)
         upsert_program(cursor,program)
 
     # song.csv内にマスター新規追加分があった場合にデータベース上に
