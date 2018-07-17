@@ -2,3 +2,4 @@
 .env
 config.ini
 result.txt
+__pycache__/
